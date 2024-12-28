@@ -1,10 +1,10 @@
 import { countryAndCityAxiosInstance, locationAxiosInstance } from "./config";
 
 const googleAPIKey = import.meta.env.VITE_GOOGLE_API_KEY;
-console.log("Google API Key:", googleAPIKey);
+
 
 const apiKey = import.meta.env.VITE_API_KEY;
-console.log("API Key:", apiKey);
+
 
 
 
