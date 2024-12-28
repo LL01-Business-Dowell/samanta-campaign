@@ -146,7 +146,7 @@ const App = () => {
       <Toaster reverseOrder={false} />
       <div className="max-w-2xl mx-auto space-y-8">
         <h1 className="text-4xl font-bold text-center text-white mb-8">
-          Location Search
+          DoWell Samanta Campaign AI
         </h1>
 
         {error && <div className="text-red-500 text-center mb-4">{error}</div>}
