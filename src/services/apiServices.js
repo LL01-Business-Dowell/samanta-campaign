@@ -6,8 +6,6 @@ const googleAPIKey = import.meta.env.VITE_GOOGLE_API_KEY;
 const apiKey = import.meta.env.VITE_API_KEY;
 
 
-
-
 export const getCountryList = async () => {
     const response = await countryAndCityAxiosInstance.post(`/get-countries-v3/?api_key=${apiKey}`);
     const countries = response.data?.data[0]?.countries || [];

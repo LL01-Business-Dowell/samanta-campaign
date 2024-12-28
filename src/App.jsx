@@ -8,6 +8,10 @@ import {
 import CustomSelect from "./CustomSelect";
 import SearchResultsTable from "./SearchResultsTable";
 import { toast, Toaster } from "react-hot-toast";
+import SearchStepper from "./SearchStepper";
+import { Loader2 } from "lucide-react";
+
+
 
 const App = () => {
   const [countries, setCountries] = useState([]);
@@ -16,17 +20,29 @@ const App = () => {
   const [selectedCity, setSelectedCity] = useState(null);
   const [rangeValue, setRangeValue] = useState(0);
   const [queryString, setQueryString] = useState("");
-  const [searchLimit, setSearchLimit] = useState(40);
+  const [searchLimit, setSearchLimit] = useState(20);
   const [loadingCountries, setLoadingCountries] = useState(false);
   const [loadingCities, setLoadingCities] = useState(false);
-  const [batchProgress, setBatchProgress] = useState({
-    completed: 0,
-    total: 0,
+  const [searchProgress, setSearchProgress] = useState({
+    activeStep: -1,
+    steps: [
+      {
+        label: "Searching Locations",
+        description: "Searching for places within the specified range",
+        details: ""
+      },
+      {
+        label: "Fetching Details",
+        description: "Retrieving detailed information for found locations",
+        details: ""
+      }
+    ]
   });
   const [searchResults, setSearchResults] = useState([]);
   const [error, setError] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
 
-  // Fetch countries on initial load
+  // Previous useEffects remain the same...
   useEffect(() => {
     const fetchCountries = async () => {
       setLoadingCountries(true);
@@ -44,7 +60,6 @@ const App = () => {
     fetchCountries();
   }, []);
 
-  // Fetch cities based on selected country
   useEffect(() => {
     if (selectedCountry) {
       const fetchCities = async () => {
@@ -71,45 +86,73 @@ const App = () => {
     }
   }, [selectedCountry]);
 
+  const calculateRangeParts = (maxRange) => {
+    const parts = [];
+    const step = maxRange / 5;
+    for (let i = 0; i < 5; i++) {
+      parts.push({
+        radius1: i * step,
+        radius2: (i + 1) * step
+      });
+    }
+    return parts;
+  };
+
+  const updateStepDetails = (step, details) => {
+    setSearchProgress(prev => ({
+      ...prev,
+      steps: prev.steps.map((s, i) => 
+        i === step ? { ...s, details } : s
+      )
+    }));
+  };
+
   const processBatchSearch = async () => {
     if (!selectedCity) {
       toast.error("Please select a city before searching.");
       return;
     }
 
-    const batchSize = 20;
-    const totalBatches = Math.ceil(searchLimit / batchSize);
-    setBatchProgress({ completed: 0, total: totalBatches });
-    setSearchResults([]); // Clear previous results
+    setIsSearching(true);
+    setSearchResults([]);
     setError(null);
+    setSearchProgress(prev => ({ ...prev, activeStep: 0 }));
 
+    const rangeParts = calculateRangeParts(parseFloat(rangeValue));
     let allPlaceIds = [];
 
-    // First phase: Collect all place IDs
-    for (let i = 0; i < totalBatches; i++) {
+    // First Step: Searching Locations
+    for (let i = 0; i < rangeParts.length; i++) {
       try {
+        const { radius1, radius2 } = rangeParts[i];
+        updateStepDetails(0, 
+          `Searching range ${(radius1).toFixed(1)}km to ${(radius2).toFixed(1)}km (${i + 1}/5)`
+        );
+
         const batchResults = await fetchSearchResults({
-          radius1: 0,
-          radius2: parseInt(rangeValue),
+          radius1: radius1 * 1000,
+          radius2: radius2 * 1000,
           center_lat: selectedCity.lat,
           center_lon: selectedCity.lon,
           query_string: queryString,
-          limit: batchSize,
+          limit: searchLimit,
         });
 
         if (batchResults && batchResults.place_id_list) {
           allPlaceIds = [...allPlaceIds, ...batchResults.place_id_list];
         }
-
-        setBatchProgress((prev) => ({ ...prev, completed: i + 1 }));
       } catch (error) {
-        console.log(error);
-        
-        setError("An error occurred during the batch search.",);
-        toast.error("An error occurred during the batch search.");
-        break;
+        console.error(error);
+        setError("An error occurred during the batch search or The API quota has been exceeded..");
+        toast.error("The API quota has been exceeded..");
+        setIsSearching(false);
+        return;
       }
     }
+
+    // Second Step: Fetching Details
+    setSearchProgress(prev => ({ ...prev, activeStep: 1 }));
+    updateStepDetails(1, `Fetching details for ${allPlaceIds.length} locations`);
 
     if (allPlaceIds.length > 0) {
       try {
@@ -131,13 +174,24 @@ const App = () => {
 
           setSearchResults(updatedResults);
           toast.success("Search completed successfully!");
+          setSearchProgress(prev => ({ ...prev, activeStep: 2 }));
         }
       } catch (error) {
-        console.log(error);
-        
+        console.error(error);
         setError("Failed to fetch detailed data.");
         toast.error("Failed to fetch detailed data.");
       }
+    }
+
+    setIsSearching(false);
+  };
+
+  const handleLimitChange = (value) => {
+    const allowedLimits = [20, 40, 60];
+    if (allowedLimits.includes(value)) {
+      setSearchLimit(value);
+    } else {
+      toast.error("Please select either 20, 40, or 60 as the search limit.");
     }
   };
 
@@ -171,20 +225,21 @@ const App = () => {
 
         <div className="space-y-4">
           <label className="block text-white text-sm font-medium">
-            Range (0-10000)
+            Range (0-10.0 KM)
           </label>
           <input
             type="range"
             min="0"
-            max="10000"
+            max="10"
+            step="0.1"
             value={rangeValue}
             onChange={(e) => setRangeValue(e.target.value)}
             className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
           />
           <div className="flex justify-between text-gray-400 text-sm">
-            <span>0</span>
-            <span>{rangeValue}</span>
-            <span>10000</span>
+            <span>0 KM</span>
+            <span>{rangeValue} KM</span>
+            <span>10.0 KM</span>
           </div>
         </div>
 
@@ -196,42 +251,37 @@ const App = () => {
             onChange={(e) => setQueryString(e.target.value)}
             className="w-full p-4 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
           />
-          <input
-            type="number"
-            placeholder="Search limit"
+          <select
             value={searchLimit}
-            onChange={(e) => setSearchLimit(Number(e.target.value))}
-            min="1"
-            max="100"
+            onChange={(e) => handleLimitChange(Number(e.target.value))}
             className="w-full p-4 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-          />
+          >
+            <option value={20}>20 results</option>
+            <option value={40}>40 results</option>
+            <option value={60}>60 results</option>
+          </select>
         </div>
 
         <button
           onClick={processBatchSearch}
-          disabled={!selectedCity}
+          disabled={!selectedCity || isSearching}
           className="w-full p-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
         >
-          Search
+          {isSearching ? (
+            <div className="flex items-center justify-center space-x-2">
+              <Loader2 className="animate-spin" />
+              <span>Searching...</span>
+            </div>
+          ) : (
+            "Search"
+          )}
         </button>
 
-        {batchProgress.total > 0 && (
-          <div className="space-y-2">
-            <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-blue-500 transition-all duration-500"
-                style={{
-                  width: `${
-                    (batchProgress.completed / batchProgress.total) * 100
-                  }%`,
-                }}
-              />
-            </div>
-            <p className="text-center text-gray-400">
-              Processing batch {batchProgress.completed} of{" "}
-              {batchProgress.total}
-            </p>
-          </div>
+        {searchProgress.activeStep >= 0 && (
+          <SearchStepper
+            activeStep={searchProgress.activeStep}
+            steps={searchProgress.steps}
+          />
         )}
 
         {searchResults.length > 0 ? (
