@@ -88,8 +88,8 @@ const App = () => {
 
   const calculateRangeParts = (maxRange) => {
     const parts = [];
-    const step = maxRange / 5;
-    for (let i = 0; i < 5; i++) {
+    const step = maxRange / 3;
+    for (let i = 0; i < 3; i++) {
       parts.push({
         radius1: i * step,
         radius2: (i + 1) * step
@@ -126,7 +126,7 @@ const App = () => {
       try {
         const { radius1, radius2 } = rangeParts[i];
         updateStepDetails(0, 
-          `Searching range ${(radius1).toFixed(1)}km to ${(radius2).toFixed(1)}km (${i + 1}/5)`
+          `Searching range ${(radius1).toFixed(1)}km to ${(radius2).toFixed(1)}km (${i + 1}/3)`
         );
 
         const batchResults = await fetchSearchResults({
@@ -157,14 +157,13 @@ const App = () => {
     if (allPlaceIds.length > 0) {
       try {
         const response = await fetchDetailsData({
-          place_ids: allPlaceIds,
+          place_id_list: allPlaceIds,
           center_loc: `${selectedCity.lat}, ${selectedCity.lon}`,
         });
-        const data = await response.json();
 
-        if (data.succesful_results) {
+        if (response.succesful_results) {
           const detailsMap = new Map(
-            data.succesful_results.map((result) => [result.placeId, result])
+            response.succesful_results.map((result) => [result.placeId, result])
           );
 
           const updatedResults = allPlaceIds.map((placeId) => {
@@ -172,6 +171,8 @@ const App = () => {
             return details ? { place_id: placeId, ...details } : { place_id: placeId };
           });
 
+          console.log(updatedResults);
+          
           setSearchResults(updatedResults);
           toast.success("Search completed successfully!");
           setSearchProgress(prev => ({ ...prev, activeStep: 2 }));
@@ -286,7 +287,6 @@ const App = () => {
 
         {searchResults.length > 0 ? (
           <div className="text-white">
-            <p>Number of results: {searchResults.length}</p>
             <SearchResultsTable searchResults={searchResults} />
           </div>
         ) : (
