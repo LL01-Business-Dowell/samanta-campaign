@@ -11,8 +11,6 @@ import { toast, Toaster } from "react-hot-toast";
 import SearchStepper from "./SearchStepper";
 import { Loader2 } from "lucide-react";
 
-
-
 const App = () => {
   const [countries, setCountries] = useState([]);
   const [cities, setCities] = useState([]);
@@ -42,7 +40,6 @@ const App = () => {
   const [error, setError] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Previous useEffects remain the same...
   useEffect(() => {
     const fetchCountries = async () => {
       setLoadingCountries(true);
@@ -86,18 +83,6 @@ const App = () => {
     }
   }, [selectedCountry]);
 
-  const calculateRangeParts = (maxRange) => {
-    const parts = [];
-    const step = maxRange / 3;
-    for (let i = 0; i < 3; i++) {
-      parts.push({
-        radius1: i * step,
-        radius2: (i + 1) * step
-      });
-    }
-    return parts;
-  };
-
   const updateStepDetails = (step, details) => {
     setSearchProgress(prev => ({
       ...prev,
@@ -118,44 +103,28 @@ const App = () => {
     setError(null);
     setSearchProgress(prev => ({ ...prev, activeStep: 0 }));
 
-    const rangeParts = calculateRangeParts(parseFloat(rangeValue));
-    let allPlaceIds = [];
-
     // First Step: Searching Locations
-    for (let i = 0; i < rangeParts.length; i++) {
-      try {
-        const { radius1, radius2 } = rangeParts[i];
-        updateStepDetails(0, 
-          `Searching range ${(radius1).toFixed(1)}km to ${(radius2).toFixed(1)}km (${i + 1}/3)`
-        );
+    try {
+      updateStepDetails(0, `Searching within ${rangeValue}km radius`);
 
-        const batchResults = await fetchSearchResults({
-          radius1: radius1 * 1000,
-          radius2: radius2 * 1000,
-          center_lat: selectedCity.lat,
-          center_lon: selectedCity.lon,
-          query_string: queryString,
-          limit: searchLimit,
-        });
+      const searchResponse = await fetchSearchResults({
+        radius1: 0,
+        radius2: rangeValue * 1000, 
+        center_lat: selectedCity.lat,
+        center_lon: selectedCity.lon,
+        query_string: queryString,
+        limit: searchLimit,
+      });
 
-        if (batchResults && batchResults.place_id_list) {
-          allPlaceIds = [...allPlaceIds, ...batchResults.place_id_list];
-        }
-      } catch (error) {
-        console.error(error);
-        setError("An error occurred during the batch search or The API quota has been exceeded..");
-        toast.error("The API quota has been exceeded..");
-        setIsSearching(false);
-        return;
+      let allPlaceIds = [];
+      if (searchResponse && searchResponse.place_id_list) {
+        allPlaceIds = searchResponse.place_id_list;
       }
-    }
 
-    // Second Step: Fetching Details
-    setSearchProgress(prev => ({ ...prev, activeStep: 1 }));
-    updateStepDetails(1, `Fetching details for ${allPlaceIds.length} locations`);
+      setSearchProgress(prev => ({ ...prev, activeStep: 1 }));
+      updateStepDetails(1, `Fetching details for ${allPlaceIds.length} locations`);
 
-    if (allPlaceIds.length > 0) {
-      try {
+      if (allPlaceIds.length > 0) {
         const response = await fetchDetailsData({
           place_id_list: allPlaceIds,
           center_loc: `${selectedCity.lat}, ${selectedCity.lon}`,
@@ -171,17 +140,18 @@ const App = () => {
             return details ? { place_id: placeId, ...details } : { place_id: placeId };
           });
 
-          console.log(updatedResults);
-          
           setSearchResults(updatedResults);
           toast.success("Search completed successfully!");
           setSearchProgress(prev => ({ ...prev, activeStep: 2 }));
         }
-      } catch (error) {
-        console.error(error);
-        setError("Failed to fetch detailed data.");
-        toast.error("Failed to fetch detailed data.");
+      } else {
+        toast.info("No results found in the specified range.");
       }
+    } catch (error) {
+      console.error(error);
+      setError("An error occurred during the search or the API quota has been exceeded.");
+      toast.error("The API quota has been exceeded.");
+      setIsSearching(false);
     }
 
     setIsSearching(false);
