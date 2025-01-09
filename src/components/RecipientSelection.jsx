@@ -62,7 +62,7 @@ const RecipientSelection = ({
                 className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
               />
               <div>
-                <p className="text-white font-medium">{recipient.name || 'Unknown Name'}</p>
+                <p className="text-white font-medium">{recipient.place_name || 'Unknown Name'}</p>
                 <p className="text-gray-400 text-sm">
                   {recipient.phone || 'No phone'} • {recipient.email || 'No email'}
                 </p>

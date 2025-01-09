@@ -174,7 +174,7 @@ const App = () => {
     const csvContent = [
       headers.join(','),
       ...searchResults.map(result => [
-        result.name || 'N/A',
+        result.place_name || 'N/A',
         result.phone || 'N/A',
         result.email || 'N/A',
         result.address || 'N/A'
